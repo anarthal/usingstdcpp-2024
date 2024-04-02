@@ -11,3 +11,4 @@ function(add_example EXE)
 endfunction()
 
 add_example(sync)
+add_example(callbacks)
