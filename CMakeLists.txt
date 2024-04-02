@@ -12,3 +12,4 @@ endfunction()
 
 add_example(sync)
 add_example(callbacks)
+add_example(coroutines)

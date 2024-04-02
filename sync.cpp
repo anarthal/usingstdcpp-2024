@@ -82,4 +82,11 @@ void handle_request_v3(asio::any_io_executor ex)
 
 // No way to set timeouts
 
-int main() { asio::io_context ctx; }
+int main()
+{
+    asio::io_context ctx;
+    handle_request_v0(ctx);
+    handle_request_v1(ctx);
+    handle_request_v2(ctx);
+    handle_request_v3(ctx.get_executor());
+}
