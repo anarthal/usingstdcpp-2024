@@ -17,8 +17,8 @@ namespace asio = boost::asio;
 
 static constexpr std::string_view request =
     "GET / HTTP/1.1\r\n"
-    "Host: www.python.org\r\n"
-    "User-Agent: curl/7.71.1\r\n"
+    "Host: www.cppreference.com\r\n"
+    "User-Agent: using-std-cpp-v0.0.0\r\n"
     "Accept: */*\r\n\r\n";
 
 void handle_request_v0(asio::io_context& ctx)
@@ -27,7 +27,7 @@ void handle_request_v0(asio::io_context& ctx)
 
     std::string buff(4096, '\0');
 
-    sock.connect(asio::ip::tcp::endpoint(asio::ip::address::from_string("151.101.64.223"), 80));
+    sock.connect(asio::ip::tcp::endpoint(asio::ip::address::from_string("74.114.90.20"), 80));
     sock.write_some(asio::buffer(request));
     std::size_t bytes_read = sock.read_some(asio::buffer(buff));
 
@@ -40,7 +40,7 @@ void handle_request_v1(asio::io_context& ctx)
 
     std::string buff;
 
-    sock.connect(asio::ip::tcp::endpoint(asio::ip::address::from_string("151.101.64.223"), 80));
+    sock.connect(asio::ip::tcp::endpoint(asio::ip::address::from_string("74.114.90.20"), 80));
 
     asio::write(sock, asio::buffer(request));
     std::size_t bytes_read = asio::read_until(sock, asio::dynamic_buffer(buff), "\r\n\r\n");
@@ -55,7 +55,7 @@ void handle_request_v2(asio::io_context& ctx)
 
     std::string buff;
 
-    auto endpoints = resolv.resolve("python.org", "80");
+    auto endpoints = resolv.resolve("cppreference.com", "80");
     asio::connect(sock, endpoints);
 
     asio::write(sock, asio::buffer(request));
@@ -71,7 +71,7 @@ void handle_request_v3(asio::any_io_executor ex)
 
     std::string buff;
 
-    auto endpoints = resolv.resolve("python.org", "80");
+    auto endpoints = resolv.resolve("cppreference.com", "80");
     asio::connect(sock, endpoints);
 
     asio::write(sock, asio::buffer(request));
