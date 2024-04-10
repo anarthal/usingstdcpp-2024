@@ -18,14 +18,18 @@
 namespace asio = boost::asio;
 using boost::system::error_code;
 
+// The GET HTTP request to send to the server
 static constexpr std::string_view request =
     "GET / HTTP/1.1\r\n"
-    "Host: www.python.org\r\n"
-    "User-Agent: curl/7.71.1\r\n"
+    "Host: example.com\r\n"
+    "User-Agent: Asio\r\n"
     "Accept: */*\r\n\r\n";
 
+// Create one of these per handle_request call
 class request_handler : public std::enable_shared_from_this<request_handler>
 {
+    // All these variables need to be kept alive until the overall handle_request operation completes
+    // (they need to have stable addresses)
     asio::ip::tcp::socket sock;
     asio::ip::tcp::resolver resolv;
     std::string buff;
@@ -33,18 +37,15 @@ class request_handler : public std::enable_shared_from_this<request_handler>
 public:
     request_handler(asio::any_io_executor ex) : sock(ex), resolv(ex) {}
 
+    // Start the async chain. We capture this as a shared_ptr to ensure correct lifetimes
     void start_resolve()
     {
-        resolv.async_resolve(
-            "python.org",
-            "80",
-            [self = shared_from_this()](error_code ec, asio::ip::tcp::resolver::results_type endpoints) {
-                if (ec)
-                    std::cerr << "Error resolving endpoints: " << ec.message() << std::endl;
-                else
-                    self->start_connect(std::move(endpoints));
-            }
-        );
+        resolv.async_resolve("example.com", "80", [self = shared_from_this()](error_code ec, auto endpoints) {
+            if (ec)
+                std::cerr << "Error resolving endpoints: " << ec.message() << std::endl;
+            else
+                self->start_connect(std::move(endpoints));
+        });
     }
 
     void start_connect(const asio::ip::tcp::resolver::results_type& endpoints)
@@ -71,6 +72,7 @@ public:
         );
     }
 
+    // This is the end of the async chain
     void start_read()
     {
         asio::async_read_until(
@@ -87,9 +89,20 @@ public:
     }
 };
 
+void handle_request(asio::any_io_executor ex)
+{
+    // Create a request_handler and start the chain
+    std::make_shared<request_handler>(ex)->start_resolve();
+}
+
 int main()
 {
+    // The execution context
     asio::io_context ctx;
-    std::make_shared<request_handler>(ctx.get_executor())->start_resolve();
+
+    // Call out function
+    handle_request(ctx.get_executor());
+
+    // Run the event loop until the chain finishes
     ctx.run();
 }
