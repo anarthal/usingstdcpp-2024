@@ -49,7 +49,6 @@ asio::awaitable<void> handle_request_impl()
     co_await asio::async_connect(sock, endpoints, asio::deferred);
 
     // Write the request
-    auto a = asio::async_write(sock, asio::buffer(request), asio::deferred);
     co_await asio::async_write(sock, asio::buffer(request), asio::deferred);
 
     // Read the response
