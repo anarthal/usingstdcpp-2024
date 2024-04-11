@@ -7,7 +7,6 @@
 #include <boost/asio/co_spawn.hpp>
 #include <boost/asio/connect.hpp>
 #include <boost/asio/deferred.hpp>
-#include <boost/asio/detail/handler_work.hpp>
 #include <boost/asio/io_context.hpp>
 #include <boost/asio/ip/address.hpp>
 #include <boost/asio/ip/tcp.hpp>
@@ -17,64 +16,78 @@
 
 #include <cstddef>
 #include <iostream>
-#include <memory>
-#include <memory_resource>
 #include <string>
 #include <string_view>
 
 namespace asio = boost::asio;
 
+// The GET HTTP request to send to the server
 static constexpr std::string_view request =
     "GET / HTTP/1.1\r\n"
-    "Host: www.python.org\r\n"
-    "User-Agent: curl/7.71.1\r\n"
+    "Host: example.com\r\n"
+    "User-Agent: Asio\r\n"
     "Accept: */*\r\n\r\n";
 
-struct my_resource : public std::pmr::memory_resource
+// A custom allocator that logs allocation and deallocation requests
+template <class T>
+struct custom_allocator
 {
-    void* do_allocate(std::size_t bytes, std::size_t alignment) override
+    using value_type = T;
+
+    custom_allocator() = default;
+
+    template <class U>
+    constexpr custom_allocator(const custom_allocator<U>&) noexcept
     {
-        std::cout << "Allocate " << bytes << " bytes\n";
-        return std::pmr::get_default_resource()->allocate(bytes, alignment);
     }
 
-    void do_deallocate(void* p, std::size_t bytes, std::size_t alignment) override
+    T* allocate(std::size_t n)
     {
-        std::pmr::get_default_resource()->deallocate(p, bytes, alignment);
+        std::cout << "Allocate " << n * sizeof(T) << " bytes\n";
+        return std::allocator<T>().allocate(n);
     }
-
-    bool do_is_equal(const std::pmr::memory_resource& other) const noexcept override
+    void deallocate(T* p, std::size_t n)
     {
-        return dynamic_cast<const my_resource*>(&other);
+        std::cout << "Deallocate " << n * sizeof(T) << "bytes\n";
+        return std::allocator<T>().deallocate(p, n);
     }
 };
 
 asio::awaitable<void> handle_request_impl()
 {
+    // Coroutines know which executor are using
     asio::any_io_executor ex = co_await asio::this_coro::executor;
 
+    // I/O objects
     asio::ip::tcp::socket sock(ex);
     asio::ip::tcp::resolver resolv(ex);
 
-    std::string buff;
+    // A completion token with an associated allocator
+    auto tok = asio::bind_allocator(custom_allocator<void>(), asio::deferred);
 
-    my_resource rsc;
+    // Resolve the hostname and port into a set of endpoints
+    auto endpoints = co_await resolv.async_resolve("example.com", "80", tok);
 
-    auto tok = asio::bind_allocator(std::pmr::polymorphic_allocator<void>(&rsc), asio::deferred);
-
-    auto endpoints = co_await resolv.async_resolve("python.org", "80", tok);
+    // Connect to the server
     co_await asio::async_connect(sock, endpoints, tok);
 
+    // Write the request
     co_await asio::async_write(sock, asio::buffer(request), tok);
+
+    // Read the response
+    std::string buff;
     std::size_t
         bytes_read = co_await asio::async_read_until(sock, asio::dynamic_buffer(buff), "\r\n\r\n", tok);
-
     std::cout << std::string_view(buff.data(), bytes_read) << std::endl;
 }
 
 void handle_request(asio::any_io_executor ex)
 {
-    asio::co_spawn(ex, handle_request_impl, [](...) {});
+    // Rethrow exceptions originated in the coroutine
+    asio::co_spawn(ex, handle_request_impl, [](std::exception_ptr exc) {
+        if (exc)
+            std::rethrow_exception(exc);
+    });
 }
 
 int main()
