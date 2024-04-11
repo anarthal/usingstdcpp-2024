@@ -43,7 +43,7 @@ asio::awaitable<void> handle_request_impl()
     asio::ip::tcp::resolver resolv(ex);
 
     // Resolve the hostname and port into a set of endpoints
-    auto endpoints = co_await resolv.async_resolve("python.org", "80", asio::deferred);
+    auto endpoints = co_await resolv.async_resolve("example.com", "80", asio::deferred);
 
     // Connect to the server
     co_await asio::async_connect(sock, endpoints, asio::deferred);
