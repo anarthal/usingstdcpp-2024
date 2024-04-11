@@ -18,5 +18,4 @@ add_example(cancellation)
 add_example(cancellation_composed)
 add_example(timeouts)
 add_example(beast)
-
 add_example(composed)
